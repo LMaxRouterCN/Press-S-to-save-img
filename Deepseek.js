@@ -964,7 +964,7 @@ function getImgElementUrl(img) {
     }
 
     // 初始化
-    console.log('[图片下载器] 已加载 (v3.6) - 悬停图片并按 S 键下载');
+    console.log('[图片下载器] 已加载 (v3.8) - 悬停图片并按 S 键下载');
     console.log('[图片下载器] B站封面高清下载已修复');
     console.log('[图片下载器] 支持快速连续下载多个图片');
 
