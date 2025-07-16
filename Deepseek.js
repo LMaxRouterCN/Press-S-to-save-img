@@ -1,9 +1,9 @@
 // ==UserScript==
-// @name         图片快捷下载器（优化兼容版）
+// @name         S键下载这个图片
 // @namespace    http://tampermonkey.net/
-// @version      3.0
-// @description  按 S 键下载当前鼠标悬停的图片，支持快速连续下载
-// @author       YourName
+// @version      3.6
+// @description  按 S 键下载当前鼠标悬浮的图片
+// @author       LMaxRouter
 // @match        *://*/*
 // @grant        GM_download
 // @grant        GM_xmlhttpRequest
@@ -13,6 +13,7 @@
 // @require      https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js
 // @run-at       document-idle
 // @grant        GM_registerMenuCommand
+// @grant        GM_notification
 // ==/UserScript==
 
 (function() {
@@ -24,10 +25,12 @@
         maxRetry: 3,                   // 最大重试次数
         timeout: 10000,                // 请求超时时间（毫秒）
         highlightColor: '#ff5252',     // 高亮边框颜色
-        highlightDuration: 3000,       // 边框显示时间（毫秒）
-        fadeInDuration: 1000,          // 淡入时间（毫秒）
-        fadeOutDuration: 1000,         // 淡出时间（毫秒）
+        highlightWidth: 3,             // 边框宽度（像素）
+        highlightDuration: 10,          // 边框显示时间（毫秒）
+        fadeInDuration: 500,           // 淡入时间（毫秒）
+        fadeOutDuration: 500,          // 淡出时间（毫秒）
         showTitleInNotification: true, // 通知中显示图片标题
+        copyToClipboard: false,        // 复制图片到剪贴板
         debug: false                   // 调试模式
     };
 
@@ -60,7 +63,7 @@
             box-sizing: border-box;
             pointer-events: none;
             z-index: 999999;
-            border: 3px solid ${config.highlightColor};
+            border-style: solid;
             border-radius: 3px;
             opacity: 0;
             animation: fade-in ${config.fadeInDuration}ms forwards;
@@ -389,6 +392,12 @@
                     </div>
                 </div>
                 <div class="image-downloader-settings-row">
+                    <div class="image-downloader-settings-row-label">边框宽度 (像素)</div>
+                    <div class="image-downloader-settings-row-value">
+                        <input type="number" class="image-downloader-settings-input" id="image-downloader-highlight-width" value="${config.highlightWidth}" min="1" max="10">
+                    </div>
+                </div>
+                <div class="image-downloader-settings-row">
                     <div class="image-downloader-settings-row-label">边框显示时间 (毫秒)</div>
                     <div class="image-downloader-settings-row-value">
                         <input type="number" class="image-downloader-settings-input" id="image-downloader-highlight-duration" value="${config.highlightDuration}" min="1000" max="10000">
@@ -412,6 +421,13 @@
                         <span class="image-downloader-settings-slider"></span>
                     </span>
                     <div class="image-downloader-settings-label-text">在通知中显示图片标题</div>
+                </label>
+                <label class="image-downloader-settings-label">
+                    <span class="image-downloader-settings-switch">
+                        <input type="checkbox" id="image-downloader-copy-to-clipboard" ${config.copyToClipboard ? 'checked' : ''}>
+                        <span class="image-downloader-settings-slider"></span>
+                    </span>
+                    <div class="image-downloader-settings-label-text">复制图片到剪贴板</div>
                 </label>
                 <label class="image-downloader-settings-label">
                     <span class="image-downloader-settings-switch">
@@ -447,10 +463,12 @@
         config.maxRetry = parseInt(document.getElementById('image-downloader-max-retry').value) || 3;
         config.timeout = parseInt(document.getElementById('image-downloader-timeout').value) || 10000;
         config.highlightColor = document.getElementById('image-downloader-highlight-color').value || '#ff5252';
+        config.highlightWidth = parseInt(document.getElementById('image-downloader-highlight-width').value) || 3;
         config.highlightDuration = parseInt(document.getElementById('image-downloader-highlight-duration').value) || 3000;
-        config.fadeInDuration = parseInt(document.getElementById('image-downloader-fade-in-duration').value) || 1000;
-        config.fadeOutDuration = parseInt(document.getElementById('image-downloader-fade-out-duration').value) || 1000;
+        config.fadeInDuration = parseInt(document.getElementById('image-downloader-fade-in-duration').value) || 500;
+        config.fadeOutDuration = parseInt(document.getElementById('image-downloader-fade-out-duration').value) || 500;
         config.showTitleInNotification = document.getElementById('image-downloader-show-title').checked;
+        config.copyToClipboard = document.getElementById('image-downloader-copy-to-clipboard').checked;
         config.debug = document.getElementById('image-downloader-debug').checked;
 
         saveConfig();
@@ -513,7 +531,7 @@
             <div class="image-downloader-notification-icon">${icon}</div>
             <div class="image-downloader-notification-content">
                 <div class="image-downloader-notification-title">${statusText}: ${displayTitle}</div>
-                <div class="image-downloader-notification-filename" title="${filename}">${filename}</div>
+                <div class="image-downloader-notification-filename" title="${filename}">${truncateLongFilename(filename)}</div>
             </div>
         `;
 
@@ -523,6 +541,18 @@
             notification.classList.remove('show');
             setTimeout(() => notification.remove(), 300);
         }, status === 'error' ? 5000 : 3000);
+    }
+
+    // 截断过长的文件名
+    function truncateLongFilename(filename) {
+        const maxLength = 50;
+        if (filename.length <= maxLength) return filename;
+        const ellipsis = '...';
+        const extMatch = filename.match(/\.\w+$/);
+        const extension = extMatch ? extMatch[0] : '';
+        const baseName = extMatch ? filename.slice(0, -extension.length) : filename;
+        const charsToKeep = maxLength - extension.length - ellipsis.length;
+        return baseName.substring(0, charsToKeep) + ellipsis + extension;
     }
 
     // 高亮图片元素
@@ -541,6 +571,7 @@
         overlay.style.left = `${rect.left + scrollLeft}px`;
         overlay.style.top = `${rect.top + scrollTop}px`;
         overlay.style.borderColor = config.highlightColor;
+        overlay.style.borderWidth = `${config.highlightWidth}px`;
 
         document.body.appendChild(overlay);
         activeHighlights.set(id, overlay);
@@ -580,27 +611,79 @@
             showNotification('downloading', title, filename);
 
             // 增强下载逻辑
-            await downloadWithRetry(imageUrl, filename, title);
+            const blob = await downloadWithRetry(imageUrl, filename, title);
+            if (!blob.type) return;
+            filename = regenerateFilenameWithBlobType(filename, blob.type);
+
+            // 下载到本地
+            const blobUrl = URL.createObjectURL(blob);
+            GM_download({
+                url: blobUrl,
+                name: filename,
+                saveAs: true,
+                onload: () => URL.revokeObjectURL(blobUrl),
+                onerror: (e) => {
+                    URL.revokeObjectURL(blobUrl);
+                    throw new Error('下载失败: ' + (e.error || '未知错误') + ` - ${title} ${filename}`);
+                }
+            });
+
             showNotification('success', title, filename);
+
+            // 如果开启了复制到剪贴板功能
+            if (config.copyToClipboard && blob) {
+                await copyImageToClipboard(blob);
+                GM_notification({
+                    text: `图片已复制到剪贴板: ${truncateLongFilename(filename)}`,
+                    title: '图片下载器',
+                    timeout: 3000,
+                    highlight: true
+                });
+            }
         } catch (error) {
             logError('下载过程中出错:', error);
-            if (title && filename) showNotification('error', title, filename);
+            showNotification('error', title || '图片', filename || '未知文件');
         } finally {
             setTimeout(() => removeHighlight(highlightId), config.highlightDuration);
         }
     }
 
+    // 关键修复：根据图片真实类型重新生成文件名
+    function regenerateFilenameWithBlobType(filename, contentType) {
+        if (!contentType || !contentType.startsWith('image/')) return filename;
+
+        const extMatch = filename.match(/\.\w+$/);
+        const currentExt = extMatch ? extMatch[0].slice(1) : '';
+        const newExt = contentType.split('/')[1];
+
+        // 特殊处理：contentType可能包含后缀如 "image/webp"
+        if (newExt && (newExt.toLowerCase() !== currentExt.toLowerCase())) {
+            const cleanFilename = filename.replace(/\.\w+$/, '');
+            // 替换部分特殊后缀
+            const extMap = {
+                'jpeg': 'jpg',
+                'svg+xml': 'svg',
+                'x-icon': 'ico'
+            };
+            const finalExt = extMap[newExt] || newExt;
+            return `${cleanFilename}.${finalExt}`;
+        }
+        return filename;
+    }
+
     // 增强下载逻辑（带重试机制）
     async function downloadWithRetry(url, filename, title) {
         let retryCount = 0;
+        let blob = null;
         while (retryCount < config.maxRetry) {
             try {
-                await downloadImage(url, filename, title);
-                return;
+                blob = await downloadImage(url, filename, title);
+                return blob;
             } catch (error) {
                 retryCount++;
+                logError(`下载失败 重试中 (${retryCount}/${config.maxRetry})`, error);
                 if (retryCount >= config.maxRetry) throw error;
-                await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
+                await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount)));
             }
         }
     }
@@ -610,6 +693,7 @@
         let currentElement = startElement;
         while (currentElement && currentElement !== document.body) {
             if (isImageElement(currentElement)) return currentElement;
+            if (isVideoElement(currentElement)) return currentElement; // 特殊处理视频封面
             currentElement = currentElement.parentElement;
         }
         return findBackgroundImageElement(startElement);
@@ -626,12 +710,32 @@
                 }
             }
         }
+
+        // B站特殊处理：尝试获取视频标题
+        if (element.tagName === 'VIDEO') {
+            const container = element.closest('.bilibili-player-video, .video-content');
+            if (container) {
+                const titleElem = container.querySelector('.video-title, .video-title-style');
+                if (titleElem && titleElem.textContent) {
+                    const title = titleElem.textContent.trim();
+                    return title.length > 30 ? title.substring(0, 30) + '...' : title;
+                }
+            }
+        }
+
         return '图片';
     }
 
     // 判断元素是否是图片元素
     function isImageElement(element) {
-        return ['IMG', 'svg', 'image', 'CANVAS'].includes(element.tagName);
+        return ['IMG', 'svg', 'image', 'CANVAS', 'FIGURE', 'DIV'].includes(element.tagName);
+    }
+
+    // 特殊处理视频元素封面
+    function isVideoElement(element) {
+        if (element.tagName !== 'VIDEO') return false;
+        const poster = element.getAttribute('poster');
+        return poster && poster.trim() !== '';
     }
 
     // 查找背景图片元素
@@ -646,12 +750,36 @@
             case 'IMG': return getImgElementUrl(imgElement);
             case 'CANVAS': return getCanvasUrl(imgElement);
             case 'svg': case 'image': return getSvgUrl(imgElement);
+            case 'VIDEO': return imgElement.getAttribute('poster'); // 获取视频封面
             default: return getBackgroundImageUrl(imgElement);
         }
     }
 
-    // 获取IMG元素的URL
+    // B站封面特殊处理 - 修复宽度1000限制问题
+    function normalizeBilibiliUrl(url) {
+        // 处理带签名的URL：移除所有查询参数以获取高清原图
+        if (/bilibili\.com/.test(window.location.host) &&
+            /\.(jpg|jpeg|png|webp|gif)$/i.test(url)) {
+            const cleanUrl = new URL(url, location.href);
+
+            // 移除所有查询参数（大小参数等）
+            cleanUrl.search = '';
+            return cleanUrl.toString();
+        }
+        return url;
+    }
+
+    // 获取IMG元素的URL - B站封面专门处理
     function getImgElementUrl(img) {
+        // B站特殊处理：获取原始尺寸图片
+        if (/bilibili\.com/.test(window.location.host)) {
+            const entries = performance?.getEntriesByName(img.src) || [];
+            const url = entries.find(e => e.initiatorType === 'img')?.name || img.src;
+
+            // 【关键修复】移除所有限制图片大小的参数
+            return normalizeBilibiliUrl(url);
+        }
+
         if (img.currentSrc && img.currentSrc.trim() !== '') return img.currentSrc;
         if (img.src && img.src.trim() !== '') return img.src;
 
@@ -691,8 +819,8 @@
     function getBackgroundImageUrl(element) {
         const style = getComputedStyle(element);
         const backgroundImage = style.backgroundImage;
-        const urlMatch = backgroundImage.match(/url$$["']?(.*?)["']?$$/);
-        return urlMatch && urlMatch[1] ? resolveUrl(urlMatch[1]) : null;
+        const urlMatch = backgroundImage.match(/url$$["']?([^"')]*)["']?$$/);
+        return urlMatch && urlMatch[1] ? resolveUrl(urlMatch[1].replace(/["']/g, '')) : null;
     }
 
     // 解析URL
@@ -704,98 +832,139 @@
         }
     }
 
-    // 下载图片
+    // 下载图片并返回blob
     async function downloadImage(url, filename, title) {
         return new Promise((resolve, reject) => {
+            // B站特殊处理：移除图片URL签名等限制参数
+            url = normalizeBilibiliUrl(url);
+
             if (url.startsWith('blob:')) {
-                downloadBlobUrl(url, filename, resolve, reject);
+                downloadBlobUrlToBlob(url, resolve, reject);
             } else if (url.startsWith('data:')) {
-                downloadDataUrl(url, filename, resolve, reject);
+                resolve(dataURLToBlob(url));
             } else {
-                GM_download({
+                GM_xmlhttpRequest({
+                    method: 'GET',
                     url: url,
-                    name: filename,
-                    saveAs: true,
-                    onload: resolve,
-                    onerror: (e) => {
-                        logError('下载失败:', e.error);
-                        reject(new Error('下载失败'));
+                    responseType: 'blob',
+                    headers: {
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36",
+                        "Accept": "image/webp,image/apng,image/svg+xml,image/*,*/*",
+                        "Referer": window.location.href
                     },
-                    timeout: config.timeout
+                    timeout: config.timeout,
+                    onload: function(response) {
+                        if (response.status >= 200 && response.status < 300) {
+                            resolve(response.response);
+                        } else {
+                            reject(new Error(`HTTP错误: ${response.status} ${url}`));
+                        }
+                    },
+                    onerror: function(error) {
+                        reject(new Error(`网络错误: ${error} ${url}`));
+                    },
+                    ontimeout: function() {
+                        reject(new Error(`请求超时: ${url}`));
+                    }
                 });
             }
         });
     }
 
-    // 下载Blob URL
-    async function downloadBlobUrl(blobUrl, filename, resolve, reject) {
-        try {
-            const response = await fetch(blobUrl);
-            if (!response.ok) throw new Error(`HTTP错误: ${response.status}`);
-            const blob = await response.blob();
-            const blobObjectUrl = URL.createObjectURL(blob);
-            GM_download({
-                url: blobObjectUrl,
-                name: filename,
-                saveAs: true,
-                onload: () => {
-                    URL.revokeObjectURL(blobObjectUrl);
-                    resolve();
-                },
-                onerror: (e) => {
-                    URL.revokeObjectURL(blobObjectUrl);
-                    logError('下载Blob失败:', e.error);
-                    reject(new Error('下载Blob失败'));
-                },
-                timeout: config.timeout
-            });
-        } catch (error) {
-            logError('处理Blob URL失败:', error);
-            reject(error);
+    // 将Data URL转换为Blob
+    function dataURLToBlob(dataURL) {
+        const [header, data] = dataURL.split(',');
+        const mediaType = header.match(/:(.*?);/)[1];
+        const binary = atob(data);
+        const array = [];
+        for (let i = 0; i < binary.length; i++) {
+            array.push(binary.charCodeAt(i));
         }
+        return new Blob([new Uint8Array(array)], {type: mediaType});
     }
 
-    // 下载Data URL
-    function downloadDataUrl(dataUrl, filename, resolve, reject) {
-        GM_download({
-            url: dataUrl,
-            name: filename,
-            saveAs: true,
-            onload: resolve,
-            onerror: (e) => {
-                logError('下载Data URL失败:', e.error);
-                reject(new Error('下载Data URL失败'));
-            },
-            timeout: config.timeout
-        });
+    // 下载Blob URL并返回Blob
+    function downloadBlobUrlToBlob(blobUrl, resolve, reject) {
+        fetch(blobUrl)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP错误: ${response.status}`);
+                }
+                return response.blob();
+            })
+            .then(resolve)
+            .catch(reject);
+    }
+
+    // 将图片复制到剪贴板
+    async function copyImageToClipboard(blob) {
+        try {
+            return navigator.clipboard.write([
+                new ClipboardItem({
+                    [blob.type]: blob
+                })
+            ]);
+        } catch (err) {
+            logError('无法复制图片:', err);
+            throw new Error('复制失败: ' + err.message);
+        }
     }
 
     // 生成文件名
     function generateFilename(url) {
-        let filename = 'image';
         try {
-            const urlObj = new URL(url);
+            // 清理URL参数（避免签名参数影响）
+            const cleanUrl = url.split('?')[0];
+            const urlObj = new URL(cleanUrl);
             const pathParts = urlObj.pathname.split('/').filter(part => part !== '');
+
+            let filename = 'image';
             if (pathParts.length > 0) {
                 const lastPart = pathParts[pathParts.length - 1];
-                const nameParts = lastPart.split('.');
-                if (nameParts.length > 1) filename = nameParts.slice(0, -1).join('.');
-                else filename = lastPart;
-            }
-        } catch (e) {}
+                filename = lastPart.split('.')[0] || filename;
 
-        const extension = url.includes('.svg') ? 'svg' : 'png';
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        return `${filename}_${timestamp}.${extension}`;
+                // 移除不需要的字符
+                filename = filename.replace(/[^\w\-]/g, '_');
+            }
+
+            // 支持WebP格式
+            const extension = /\.webp(\?.*)?$/.test(url) ? 'webp' :
+                             /\.svg(\?.*)?$/i.test(url) ? 'svg' :
+                             /\.jpeg|\.jpg(\?.*)?$/i.test(url) ? 'jpg' :
+                             /\.png(\?.*)?$/i.test(url) ? 'png' : 'png';
+
+            const timestamp = new Date().toISOString()
+                .replace(/[:.]/g, '-')
+                .split('T')
+                .join('_')
+                .substring(0, 19);
+
+            return `${filename}_${timestamp}.${extension}`;
+        } catch (e) {
+            return `image_${Date.now()}.png`;
+        }
     }
 
     // 错误日志
     function logError(message, error) {
-        if (config.debug) console.error(`[图片下载器] ${message}`, error);
+        if (config.debug) {
+            console.error(`[图片下载器] ${message}`, error);
+
+            // 显示详细的错误通知
+            const errorDetail = `${error.message || error}`.substring(0, 100);
+            GM_notification({
+                text: `错误: ${errorDetail}`,
+                title: '图片下载器调试',
+                timeout: 5000,
+                highlight: false
+            });
+        }
     }
 
     // 初始化
-    console.log('[图片下载器] 已加载 - 悬停图片并按 S 键下载');
+    console.log('[图片下载器] 已加载 (v3.6) - 悬停图片并按 S 键下载');
+    console.log('[图片下载器] B站封面高清下载已修复');
     console.log('[图片下载器] 支持快速连续下载多个图片');
+
     GM_registerMenuCommand('图片下载器设置', openSettingsPanel);
 })();
