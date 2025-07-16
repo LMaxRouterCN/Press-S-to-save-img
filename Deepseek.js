@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         S键下载这个图片
 // @namespace    http://tampermonkey.net/
-// @version      3.6
+// @version      3.8
 // @description  按 S 键下载当前鼠标悬浮的图片
 // @author       LMaxRouter
 // @match        *://*/*
@@ -770,28 +770,30 @@
     }
 
     // 获取IMG元素的URL - B站封面专门处理
-    function getImgElementUrl(img) {
-        // B站特殊处理：获取原始尺寸图片
-        if (/bilibili\.com/.test(window.location.host)) {
-            const entries = performance?.getEntriesByName(img.src) || [];
-            const url = entries.find(e => e.initiatorType === 'img')?.name || img.src;
+function getImgElementUrl(img) {
+    let url = img.currentSrc || img.src || '';
 
-            // 【关键修复】移除所有限制图片大小的参数
-            return normalizeBilibiliUrl(url);
-        }
-
-        if (img.currentSrc && img.currentSrc.trim() !== '') return img.currentSrc;
-        if (img.src && img.src.trim() !== '') return img.src;
-
-        const lazyAttributes = ['data-src', 'data-original', 'data-srcset', 'data-lazy-src', 'data-url'];
-        for (const attr of lazyAttributes) {
-            if (img.hasAttribute(attr)) {
-                const value = img.getAttribute(attr);
-                if (value && value.trim() !== '') return resolveUrl(value);
+    // 尝试从 lazyload 属性中获取 URL
+    const lazyAttrs = ['data-src', 'data-original', 'data-srcset', 'data-lazy-src', 'data-url'];
+    for (const attr of lazyAttrs) {
+        if (img.hasAttribute(attr)) {
+            const val = img.getAttribute(attr);
+            if (val && val.trim()) {
+                url = val;
+                break;
             }
         }
-        return null;
     }
+
+    // 如果是 B 站封面图，进行特殊处理（移除@参数，改为高清原图）
+    if (url.includes('bfs') && /\.(jpg|png|webp)(@|$)/.test(url)) {
+        url = url.split('@')[0];           // 移除@后缀
+        url = url.replace(/\.webp$/, '.jpg'); // 转换格式为 jpg
+    }
+
+    return resolveUrl(url);
+}
+
 
     // 获取Canvas元素的URL
     function getCanvasUrl(canvas) {
