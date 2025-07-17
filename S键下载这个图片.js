@@ -14,6 +14,9 @@
 // @run-at       document-idle
 // @grant        GM_registerMenuCommand
 // @grant        GM_notification
+// @homepageURL  https://github.com/LMaxRouterCN/Press-S-to-save-img
+// @updateURL    https://github.com/LMaxRouterCN/Press-S-to-save-img/edit/main/S%E9%94%AE%E4%B8%8B%E8%BD%BD%E8%BF%99%E4%B8%AA%E5%9B%BE%E7%89%87.js
+// @downloadURL  https://github.com/LMaxRouterCN/Press-S-to-save-img/edit/main/S%E9%94%AE%E4%B8%8B%E8%BD%BD%E8%BF%99%E4%B8%AA%E5%9B%BE%E7%89%87.js
 // ==/UserScript==
 
 (function() {
