@@ -4,7 +4,7 @@
 // @version      3.8
 // @description  按 S 键下载当前鼠标悬浮的图片
 // @author       LMaxRouter
-// @match        https://github.com/LMaxRouterCN/Press-S-to-save-img
+// @match        *://*/*
 // @grant        GM_download
 // @grant        GM_xmlhttpRequest
 // @grant        GM_info
